@@ -32,6 +32,7 @@ function App() {
         <Route path="/tournament/:tournamentId/edit-team/:teamId" element={<EditTeam />} />
         <Route path="/tournament/:tournamentId/team/:teamId" element={<TeamDetails />} />
         <Route path="/tournament/:tournamentId/team/:teamId/add-players" element={<AddPlayer />} />
+        <Route path="/edit-team/:teamId" element={<EditTeam />} />
       </Routes>
     </Router>
   );

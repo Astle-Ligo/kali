@@ -9,10 +9,11 @@ const AddPlayer = () => {
 
     const [tournament, setTournament] = useState(null);
     const [players, setPlayers] = useState([]);
+    const [captain, setCaptain] = useState(null);
+    const [viceCaptain, setViceCaptain] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // Fetch tournament details
     useEffect(() => {
         const fetchTournament = async () => {
             try {
@@ -29,11 +30,10 @@ const AddPlayer = () => {
         fetchTournament();
     }, [tournamentId]);
 
-    // Initialize players after fetching tournament data
     useEffect(() => {
         if (tournament) {
-            const mainPlayersCount = tournament.numPlayers ?? 11; // Default 11 main players
-            const subPlayersCount = tournament.numSubs ?? 8; // Default 8 substitutes
+            const mainPlayersCount = tournament.numPlayers ?? 11;
+            const subPlayersCount = tournament.numSubs ?? 8;
             const totalPlayers = mainPlayersCount + subPlayersCount;
 
             setPlayers(
@@ -42,6 +42,8 @@ const AddPlayer = () => {
                     jerseyNumber: "",
                     position: "",
                     type: index < mainPlayersCount ? "main" : "sub",
+                    isCaptain: false,
+                    isViceCaptain: false,
                 }))
             );
         }
@@ -57,13 +59,37 @@ const AddPlayer = () => {
         setPlayers(updatedPlayers);
     };
 
+    const handleCaptainChange = (playerIndex) => {
+        if (viceCaptain === playerIndex) {
+            setViceCaptain(null); // Remove as vice-captain if selected as captain
+        }
+        setCaptain(playerIndex === captain ? null : playerIndex);
+    };
+
+    const handleViceCaptainChange = (playerIndex) => {
+        if (captain === playerIndex) {
+            setCaptain(null); // Remove as captain if selected as vice-captain
+        }
+        setViceCaptain(playerIndex === viceCaptain ? null : playerIndex);
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
+
+        // Update players list to include isCaptain and isViceCaptain
+        const updatedPlayers = players.map((player, index) => ({
+            ...player,
+            isCaptain: index === captain,      // Set true if this player is the captain
+            isViceCaptain: index === viceCaptain, // Set true if this player is the vice-captain
+        }));
+
         try {
             await axios.post(
-                `${process.env.REACT_APP_API_URL}/api/teams/${teamId}/add-player`, // ✅ Matches backend route
-                { players },
+                `${process.env.REACT_APP_API_URL}/api/teams/${teamId}/add-player`,
+                {
+                    players: updatedPlayers,  // Send modified players list
+                },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
@@ -78,53 +104,83 @@ const AddPlayer = () => {
 
     return (
         <div className="p-6 bg-gray-100 min-h-screen flex justify-center items-center">
-            <div className="max-w-2xl bg-white shadow-lg rounded-lg p-6 w-full">
+            <div className="max-w-4xl bg-white shadow-lg rounded-lg p-6 w-full">
                 <h1 className="text-2xl font-bold mb-6 text-center">➕ Add Players</h1>
 
                 {error && <p className="text-red-500 text-center">{error}</p>}
 
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    {players.map((player, index) => (
-                        <div
-                            key={index}
-                            className={`p-4 border rounded-md ${player.type === "main" ? "bg-blue-100" : "bg-yellow-100"}`}
-                        >
-                            <h3 className="font-semibold">
-                                {player.type === "main" ? "⚽ Main Player" : "🔄 Substitute"} #{index + 1}
-                            </h3>
-
-                            <input
-                                type="text"
-                                placeholder="Player Name"
-                                value={player.name}
-                                onChange={(e) => handlePlayerChange(index, "name", e.target.value)}
-                                required={player.type === "main"}
-                                className="w-full p-2 border rounded-md mt-2"
-                            />
-                            <input
-                                type="number"
-                                placeholder="Jersey Number"
-                                value={player.jerseyNumber}
-                                onChange={(e) => handlePlayerChange(index, "jerseyNumber", e.target.value)}
-                                required={player.type === "main"}
-                                className="w-full p-2 border rounded-md mt-2"
-                            />
-
-                            {/* Player Position Dropdown */}
-                            <select
-                                value={player.position}
-                                onChange={(e) => handlePlayerChange(index, "position", e.target.value)}
-                                required={player.type === "main"}
-                                className="w-full p-2 border rounded-md mt-2 bg-white"
-                            >
-                                <option value="" disabled>Select Position</option>
-                                <option value="Forward">Forward</option>
-                                <option value="Midfielder">Midfielder</option>
-                                <option value="Defender">Defender</option>
-                                <option value="Goalkeeper">Goalkeeper</option>
-                            </select>
-                        </div>
-                    ))}
+                <form onSubmit={handleSubmit}>
+                    <table className="w-full bg-white shadow-md rounded-lg overflow-hidden">
+                        <thead className="bg-gray-300">
+                            <tr>
+                                <th className="px-4 py-2">#</th>
+                                <th className="px-4 py-2">Jersey Number</th>
+                                <th className="px-4 py-2">Player Name</th>
+                                <th className="px-4 py-2">Position</th>
+                                <th className="px-4 py-2">Captain</th>
+                                <th className="px-4 py-2">Vice-Captain</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {players.map((player, index) => (
+                                <tr
+                                    key={index}
+                                    className={`text-center border-b ${player.type === "main" ? "bg-blue-100" : "bg-yellow-100"
+                                        }`}
+                                >
+                                    <td className="px-4 py-2">{index + 1}</td>
+                                    <td className="px-4 py-2">
+                                        <input
+                                            type="number"
+                                            value={player.jerseyNumber}
+                                            onChange={(e) => handlePlayerChange(index, "jerseyNumber", e.target.value)}
+                                            required={player.type === "main"}
+                                            className="w-full p-2 border rounded-md"
+                                        />
+                                    </td>
+                                    <td className="px-4 py-2">
+                                        <input
+                                            type="text"
+                                            value={player.name}
+                                            onChange={(e) => handlePlayerChange(index, "name", e.target.value)}
+                                            required={player.type === "main"}
+                                            className="w-full p-2 border rounded-md"
+                                        />
+                                    </td>
+                                    <td className="px-4 py-2">
+                                        <select
+                                            value={player.position}
+                                            onChange={(e) => handlePlayerChange(index, "position", e.target.value)}
+                                            required={player.type === "main"}
+                                            className="w-full p-2 border rounded-md bg-white"
+                                        >
+                                            <option value="" disabled>Select Position</option>
+                                            <option value="Forward">Forward</option>
+                                            <option value="Midfielder">Midfielder</option>
+                                            <option value="Defender">Defender</option>
+                                            <option value="Goalkeeper">Goalkeeper</option>
+                                        </select>
+                                    </td>
+                                    <td className="px-4 py-2">
+                                        <input
+                                            type="radio"
+                                            name="captain"
+                                            checked={captain === index}
+                                            onChange={() => handleCaptainChange(index)}
+                                        />
+                                    </td>
+                                    <td className="px-4 py-2">
+                                        <input
+                                            type="radio"
+                                            name="viceCaptain"
+                                            checked={viceCaptain === index}
+                                            onChange={() => handleViceCaptainChange(index)}
+                                        />
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
 
                     <button
                         type="submit"
@@ -140,3 +196,4 @@ const AddPlayer = () => {
 };
 
 export default AddPlayer;
+

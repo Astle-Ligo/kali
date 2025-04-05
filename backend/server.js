@@ -9,6 +9,8 @@ const authRoutes = require("./routes/authRoutes");
 const tournamentRoutes = require("./routes/tournamentRoutes");
 const teamRoutes = require("./routes/teamRoutes"); // Import the team routes
 const userRoutes = require("./routes/users");
+const matchRoutes = require("./routes/matchRoutes")
+const playerRoutes = require("./routes/playerRoutes")
 
 
 connectDB();
@@ -35,6 +37,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/tournaments", tournamentRoutes);
 app.use("/api/teams", teamRoutes);
 app.use("/api/users", userRoutes)
+app.use("/api/matches", matchRoutes)
+app.use("/api/players", playerRoutes)
 
 console.log("JWT Secret:", process.env.JWT_SECRET);
 

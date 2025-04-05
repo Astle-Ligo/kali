@@ -1,18 +1,27 @@
+const mongoose = require('mongoose')
 const Team = require("../models/Team")
-const Tournament = require("../models/tournament");
+const Tournament = require("../models/Tournament");
 const User = require("../models/user");
+const Match = require("../models/match")
+const Player = require("../models/Players"); // Import the Player model
+
 
 // @desc Create a new team
 // @route POST /api/teams/create
 // @access Private (Only logged-in users)
 const createTeam = async (req, res) => {
     try {
-        console.log("Received request body:", req.body);  // Debugging
+        console.log("Received request body:", req.body);
 
         const { name, tournamentId, manager, contact, email, players } = req.body;
 
         if (!name || !tournamentId || !manager) {
+            console.error("Missing required fields:", { name, tournamentId, manager });
             return res.status(400).json({ message: "Team name, tournament ID, and manager name are required" });
+        }
+
+        if (!mongoose.Types.ObjectId.isValid(tournamentId)) {
+            return res.status(400).json({ message: "Invalid tournament ID format" });
         }
 
         const tournament = await Tournament.findById(tournamentId);
@@ -23,7 +32,7 @@ const createTeam = async (req, res) => {
         const newTeam = new Team({
             name,
             tournament: tournamentId,
-            manager, // Store manager name as string
+            manager,
             contact,
             email,
             players,
@@ -33,10 +42,11 @@ const createTeam = async (req, res) => {
         await newTeam.save();
         tournament.teams.push(newTeam._id);
         await tournament.save();
+
         res.status(201).json({ message: "Team created successfully", team: newTeam });
     } catch (error) {
-        console.error("Error creating team:", error);
-        res.status(500).json({ message: error.message });
+        console.error("🚨 Error creating team:", error);
+        res.status(500).json({ message: "Server error", error: error.message });
     }
 };
 
@@ -55,12 +65,23 @@ const getTeamsByTournament = async (req, res) => {
     }
 };
 
-// @desc Get a single team by ID
+// @desc Get a single team by IDf
 // @route GET /api/teams/:id
 // @access Public
 const getTeamById = async (req, res) => {
     try {
-        const team = await Team.findById(req.params.id);
+        const { id } = req.params;
+
+        // Validate ObjectId format
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ message: "Invalid team ID" });
+        }
+
+        // Find team and optionally populate fields (e.g., tournament, players)
+        const team = await Team.findById(id)
+            .populate("tournament", "name location") // Example: populate tournament name and location
+            .populate("players", "name jerseyNumber") // Example: populate player names and positions
+            .lean(); // Convert Mongoose document to a plain object
 
         if (!team) {
             return res.status(404).json({ message: "Team not found" });
@@ -156,36 +177,76 @@ const addPlayers = async (req, res) => {
             return res.status(400).json({ message: "Invalid players data" });
         }
 
-        const team = await Team.findById(teamId);
+        const team = await Team.findById(teamId).populate("tournament");
         if (!team) {
             return res.status(404).json({ message: "Team not found" });
         }
 
         console.log("Team found:", team.name);
 
+        const tournament = team.tournament;
+        const maxPlayers = (tournament.numPlayers ?? 11) + (tournament.numSubs ?? 8);
+
+        if (team.players.length + players.length > maxPlayers) {
+            return res.status(400).json({ message: `Maximum ${maxPlayers} players allowed per team.` });
+        }
+
+        // Ensure only one captain and one vice-captain
+        const captainCount = players.filter(p => p.isCaptain).length;
+        const viceCaptainCount = players.filter(p => p.isViceCaptain).length;
+
+        if (captainCount > 1) {
+            return res.status(400).json({ message: "Only one captain is allowed." });
+        }
+        if (viceCaptainCount > 1) {
+            return res.status(400).json({ message: "Only one vice-captain is allowed." });
+        }
+
+        // Prevent duplicate jersey numbers
+        const existingJerseyNumbers = new Set(team.players.map(p => p.jerseyNumber));
+        for (const player of players) {
+            if (existingJerseyNumbers.has(player.jerseyNumber)) {
+                return res.status(400).json({ message: `Jersey number ${player.jerseyNumber} is already taken.` });
+            }
+        }
+
         // Add new players to the team
-        const newPlayers = players.map(player => ({
-            name: player.name,
-            jerseyNumber: player.jerseyNumber,
-            position: player.position,
-            matchesPlayed: player.matchesPlayed || 0,
-            goals: player.goals || 0,
-            assists: player.assists || 0,
-            yellowCards: player.yellowCards || 0,
-            redCards: player.redCards || 0,
+        const validPlayers = players.filter(player => player.name && player.jerseyNumber); // ✅ Ensure required fields
+
+        if (validPlayers.length === 0) {
+            return res.status(400).json({ message: "No valid players provided." });
+        }
+
+        const newPlayers = await Promise.all(validPlayers.map(async (player) => {
+            const newPlayer = new Player({
+                name: player.name,
+                jerseyNumber: player.jerseyNumber,
+                position: player.position || undefined,  // ❗ Use `undefined` instead of `null` to avoid validation issues
+                team: teamId, // ✅ Assign this player to the team
+                matchesPlayed: player.matchesPlayed ?? undefined, // ✅ Optional field
+                goals: player.goals ?? undefined,
+                assists: player.assists ?? undefined,
+                yellowCards: player.yellowCards ?? undefined,
+                redCards: player.redCards ?? undefined,
+                isCaptain: player.isCaptain ?? false,
+                isViceCaptain: player.isViceCaptain ?? false
+            });
+
+            await newPlayer.save(); // ✅ Save player to the database
+            return newPlayer._id; // ✅ Store only the ID
         }));
 
         team.players.push(...newPlayers);
         await team.save();
 
-        console.log("Players added successfully");
-
         res.status(201).json({ message: "Players added successfully", team });
+
     } catch (error) {
-        console.error("🚨 Error adding players:", error.message); // 👈 Log the full error
+        console.error("🚨 Error adding players:", error.message);
         res.status(500).json({ message: "Server error", error: error.message });
     }
 };
+
 
 
 module.exports = { createTeam, getTeamsByTournament, getTeamById, joinTeam, deleteTeam, updateTeam, addPlayers };

@@ -73,9 +73,10 @@ const tournamentSchema = new mongoose.Schema(
             type: String,
             trim: true,
         },
+        matches: [{ type: mongoose.Schema.Types.ObjectId, ref: "Match" }],
     },
     { timestamps: true }
 );
 
-const Tournament = mongoose.model("Tournament", tournamentSchema);
+const Tournament = mongoose.models.Tournament || mongoose.model("Tournament", tournamentSchema);
 module.exports = Tournament;

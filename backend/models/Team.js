@@ -1,16 +1,5 @@
 const mongoose = require("mongoose");
 
-const playerSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  jerseyNumber: { type: Number, required: true },
-  position: { type: String, required: true },
-  matchesPlayed: { type: Number, default: 0 },
-  goals: { type: Number, default: 0 },
-  assists: { type: Number, default: 0 },
-  yellowCards: { type: Number, default: 0 },
-  redCards: { type: Number, default: 0 },
-});
-
 const teamSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
@@ -18,7 +7,7 @@ const teamSchema = new mongoose.Schema(
     manager: { type: String, required: true }, // Changed from ObjectId to String
     contact: { type: String, required: true },
     email: { type: String, required: true },
-    players: [playerSchema], // ✅ Store players as objects instead of strings
+    players: [{ type: mongoose.Schema.Types.ObjectId, ref: "Player" }], // ✅ Store players as objects instead of strings
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   },
   { timestamps: true }
