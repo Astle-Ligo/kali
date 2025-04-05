@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Trophy, Users, Calendar, Shield, ChevronRight, Trophy as TrophyIcon, Star, ArrowRight } from 'lucide-react';
 
 
-const Home = () => {
+const LandingPage = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const navigate = useNavigate();
 
@@ -248,4 +248,4 @@ const Home = () => {
 }
 
 
-export default Home;
+export default LandingPage;
